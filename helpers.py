@@ -56,6 +56,12 @@ class CustomDataGenerator(tf.keras.utils.Sequence):
                 img_raw = img_raw[rand_y:rand_y+self.target_height, rand_x:rand_x+self.target_width]
                 img_mask = img_mask[rand_y:rand_y+self.target_height, rand_x:rand_x+self.target_width]
 
+                # Random flipping.
+                perform_flip = np.random.rand(1) < 0.5
+                if perform_flip:
+                    img_raw = np.flip(img_raw, axis=1)
+                    img_mask = np.flip(img_mask, axis=1)
+                
             X[i] = img_raw
             Y[i] = img_mask
         return X, Y
