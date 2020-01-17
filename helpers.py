@@ -14,18 +14,23 @@ import skimage.transform
 import glob
 import matplotlib.pyplot as plt
 from IPython.display import clear_output
+import cv2
+
+INPUT_SPATIAL = 224
+N_CLASSES = 6
 
 
 class CustomDataGenerator(tf.keras.utils.Sequence):
     """Custom data generator that yields tuples of (image, mask) for a pre-processed version of the Pascal VOC 2012 dataset."""
-    def __init__(self, source_raw, source_mask, filenames, batch_size, target_height, target_width):
+    def __init__(self, source_raw, source_mask, filenames, batch_size, target_height, target_width, augmentation=True, full_resolution=False):
         self.source_raw = source_raw
         self.source_mask = source_mask
         self.filenames = filenames
         self.batch_size = batch_size
         self.target_height = target_height
         self.target_width = target_width
-        self.augmentation = True
+        self.augmentation = augmentation
+        self.full_resolution = full_resolution
         self.on_epoch_end()
 
     def on_epoch_end(self):
@@ -37,13 +42,17 @@ class CustomDataGenerator(tf.keras.utils.Sequence):
         # Generate data
         X, y = self.__data_generation(cur_files)
         return X, y
-    
+
     def __data_generation(self, cur_files):
         X = np.empty(shape=(self.batch_size, self.target_height, self.target_width, 3))
         Y = np.empty(shape=(self.batch_size, self.target_height, self.target_width, 1), dtype=np.int32)
         for i, file in enumerate(cur_files):            
-            img_raw = img_to_array(load_img(os.path.join(self.source_raw, file) + '.jpg', interpolation='bilinear', target_size=(256, 256)))
-            img_raw = tf.keras.applications.resnet50.preprocess_input(img_raw)
+            img_raw = img_to_array(load_img(os.path.join(self.source_raw, file) + '.jpg', interpolation='bilinear', target_size=(256, 256))) 
+
+            # The preprocessing function varies by architecture. 
+            # e.g. for ResNet50, caffe-style preprocessing is used.
+            # e.g. for MobileNetV2, tf-style preprocessing is used.
+            img_raw = tf.keras.applications.mobilenet_v2.preprocess_input(img_raw) 
             
             # General note: people sometimes accidentally use bilinear interpolation when resizing masks.
             # If you need to resize, make sure to use nearest neighbor interpolation only to avoid invalid class labels.
@@ -51,24 +60,29 @@ class CustomDataGenerator(tf.keras.utils.Sequence):
       
             if self.augmentation:
                 # Random cropping.
-                rand_x = np.random.randint(img_raw.shape[1] - self.target_width)
-                rand_y = np.random.randint(img_raw.shape[0] - self.target_height)
-                img_raw = img_raw[rand_y:rand_y+self.target_height, rand_x:rand_x+self.target_width]
-                img_mask = img_mask[rand_y:rand_y+self.target_height, rand_x:rand_x+self.target_width]
+                crop_x = np.random.randint(img_raw.shape[1] - self.target_width)
+                crop_y = np.random.randint(img_raw.shape[0] - self.target_height)
+            else: # Take center crop instead.
+                crop_x = (img_raw.shape[1] - self.target_width) // 2
+                crop_y = (img_raw.shape[0] - self.target_height) // 2
 
-                # Random flipping.
-                perform_flip = np.random.rand(1) < 0.5
-                if perform_flip:
-                    img_raw = np.flip(img_raw, axis=1)
-                    img_mask = np.flip(img_mask, axis=1)
+            if not self.full_resolution:
+              img_raw = img_raw[crop_y:crop_y+self.target_height, crop_x:crop_x+self.target_width]
+              img_mask = img_mask[crop_y:crop_y+self.target_height, crop_x:crop_x+self.target_width]
                 
+            # Random flipping.
+            perform_flip = np.random.rand(1) < 0.5
+            if self.augmentation and perform_flip:
+                img_raw = np.flip(img_raw, axis=1)
+                img_mask = np.flip(img_mask, axis=1)
+
             X[i] = img_raw
             Y[i] = img_mask
         return X, Y
     
     def __len__(self):
         return int(np.floor(len(self.filenames) / self.batch_size))
-
+    
 class CustomCallback(tf.keras.callbacks.Callback):
     """Custom callback to show a simple visualization of the losses during training."""
     
