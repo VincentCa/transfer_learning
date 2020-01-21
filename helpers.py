@@ -43,11 +43,14 @@ def run_patch_predict(img):
     """Runs the segmentation model on a single image patch (224 x 224) with flipping.
 
     Args:
-        img: Input image of shape [B, H=224, W=224, C=3].
+        img: Input image of shape [B, H=224, W=224, C=3] with intensities within range [0,1].
 
     Returns:
         Segmentation prediction of shape [B, H=224, W=224, N_CLASSES=6].
     """
+    img = img.copy() * 255.  # Renorm to [0, 255].
+    img = tf.keras.applications.mobilenet_v2.preprocess_input(img)  # Pre-process for MobileNetv2.
+    
     left = model.predict(img)
     flip = np.flip(model.predict(np.flip(img, axis=2)), axis=2)
     return (left + flip) / 2
@@ -60,7 +63,7 @@ def run_predict(img, step=3):
     sliding-window fashion to combine multiple per-patch results.
 
     Args:
-        img: Input image of shape [B, H, W, C=3].
+        img: Input image of shape [B, H, W, C=3] with intensities within range [0,1].
         step: Step size for the sliding window.
 
     Returns:
