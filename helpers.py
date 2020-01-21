@@ -72,7 +72,7 @@ def run_predict(model, img, step=3):
     if img.shape[1] != 256 or img.shape[2] != 256:
         img_new = np.zeros(shape=(img.shape[0], 256, 256, img.shape[3]))
         for i in range(img.shape[0]):
-          img_new[i] = cv2.resize(img[i], (256, 256), interpolation=cv2.INTER_LINEAR)  # Resize input image as needed.
+            img_new[i] = cv2.resize(img[i], (256, 256), interpolation=cv2.INTER_LINEAR)  # Resize input image as needed.
         img = img_new
 
     canvas = np.zeros(shape=list(img.shape[:3]) + [N_CLASSES], dtype=np.float32)
