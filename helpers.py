@@ -53,17 +53,22 @@ def run_patch_predict(img):
     return (left + flip) / 2
 
 def run_predict(img, step=3):
-    """Runs the segmentation model on a larger image (intended: 256 x 256).
+    """Runs the segmentation model on a larger image.
 
-    Follows a sliding-window fashion and combines multiple per-patch results.
+    This specific procedure is quite arbitrary: it resizes the input image 
+    to 256 x 256 regardless of aspect ratio, and applies the network in a 
+    sliding-window fashion to combine multiple per-patch results.
 
     Args:
-        img: Input image of shape [B, H=256, W=256, C=3].
+        img: Input image of shape [B, H, W, C=3].
         step: Step size for the sliding window.
 
     Returns:
         Segmentation prediction of shape [B, H=256, W=256, N_CLASSES=6].
     """
+    if img.shape[1] != 256 or img.shape[2] != 256:
+        img = cv2.resize(img, (256, 256), interpolation=cv2.INTER_LINEAR)  # Resize input image as needed.
+    
     canvas = np.zeros(shape=list(img.shape[:3]) + [N_CLASSES], dtype=np.float32)
     num_hits = np.zeros_like(canvas, dtype=np.int32)
 
