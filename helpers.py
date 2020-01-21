@@ -292,12 +292,12 @@ def label_to_color_image(label):
       map maximum entry.
     """
     if label.ndim != 2:
-    raise ValueError('Expect 2-D input label')
+        raise ValueError('Expect 2-D input label')
 
     colormap = create_pascal_label_colormap()
 
     if np.max(label) >= len(colormap):
-    raise ValueError('label value too large.')
+        raise ValueError('label value too large.')
 
     return colormap[label]
 
