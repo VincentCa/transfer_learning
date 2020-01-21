@@ -84,7 +84,8 @@ def run_predict(img, step=3):
             # Combine results.
             canvas[:, cy:cy+224, cx:cx+224] += res
             num_hits[:, cy:cy+224, cx:cx+224] += 1
-            return canvas / num_hits
+    return canvas / num_hits
+
 
 # ---------------------------
 # Define custom data generator.
@@ -152,12 +153,3 @@ class CustomDataGenerator(tf.keras.utils.Sequence):
     
     def __len__(self):
         return int(np.floor(len(self.filenames) / self.batch_size))
-   
-
-
-
-
-
-
-
-
