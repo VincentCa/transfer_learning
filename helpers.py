@@ -200,6 +200,7 @@ class TeacherDataGenerator(tf.keras.utils.Sequence):
         np.random.shuffle(self.filenames)
 
     def __getitem__(self, index):
+        ''''get the next item of the generator'''
         cur_files = self.filenames[index*self.batch_size:(index+1)*self.batch_size]
         # Generate data
         X, y = self.__data_generation(cur_files)
@@ -207,6 +208,7 @@ class TeacherDataGenerator(tf.keras.utils.Sequence):
 
 
     def __data_generation(self, cur_files):
+        '''generates the input image and the labels: gt and teacher output.'''
         X_student = np.empty(shape=(self.batch_size, self.target_height, self.target_width, 3))
         X_teacher = np.empty(shape=(self.batch_size, self.target_height, self.target_width, 3))
         Y_true = np.empty(shape=(self.batch_size, self.target_height, self.target_width, 1), dtype=np.int32)
@@ -215,7 +217,7 @@ class TeacherDataGenerator(tf.keras.utils.Sequence):
             img_raw = img_to_array(load_img(os.path.join(self.source_raw, file) + '.jpg', interpolation='bilinear', target_size=(256, 256)))
 
             img_mobilenet = tf.keras.applications.mobilenet_v2.preprocess_input(img_raw)
-            img_deeplab = img_raw/255.
+            img_deeplab = img_raw/255.0
 
             # General note: people sometimes accidentally use bilinear interpolation when resizing masks.
             # If you need to resize, make sure to use nearest neighbor interpolation only to avoid invalid class labels.
@@ -248,15 +250,14 @@ class TeacherDataGenerator(tf.keras.utils.Sequence):
         # We need the teacher's output to supervise the student network.
         # We pass the input X through the teacher network and save the result as our teacher labels.
         Y_teacher = self.teacher_model.predict(X_teacher)
-        Y_teacher = Y_teacher[:,:,:,self.classes_to_keep]
+        Y_teacher = Y_teacher[:,:,:, self.classes_to_keep]
 
         # We return both the true labels and the teacher's output. We use both
         # as supervision for the student model.
         return X, [Y_teacher, Y_true]
 
     def __len__(self):
-        return int(np.floor(len(self.filenames) / self.batch_size)
-
+        return int(np.floor(len(self.filenames) / self.batch_size))
 
 def create_pascal_label_colormap():
     '''Creates a label colormap used in PASCAL VOC segmentation benchmark.
