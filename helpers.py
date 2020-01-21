@@ -17,6 +17,74 @@ from IPython.display import clear_output
 import cv2
 
 
+# ---------------------------
+# Define helper functions for inference/visualization.
+# ---------------------------
+
+def plot_history(histories, titles):
+    plt.figure(figsize=(12, 6))
+    for history, title in zip(histories, titles):
+        loss = history.history['loss']
+        val_loss = history.history['val_loss']
+
+        plt.plot(range(1, len(loss)+1), loss, label='Training Loss: ' + title)
+        plt.plot(range(1, len(loss)+1), val_loss, label='Validation Loss: ' + title)
+        plt.legend()
+        plt.ylabel('Cross Entropy')
+        plt.title('Training and Validation Loss')
+        plt.xlabel('epoch')
+    plt.show()
+
+def norm_vis(img, mode='rgb'):
+    img_norm = (img - img.min()) / (img.max() - img.min())
+    return img_norm if mode == 'rgb' else np.flip(img_norm, axis=2)
+
+def run_patch_predict(img):
+    """Runs the segmentation model on a single image patch (224 x 224) with flipping.
+
+    Args:
+        img: Input image of shape [B, H=224, W=224, C=3].
+
+    Returns:
+        Segmentation prediction of shape [B, H=224, W=224, N_CLASSES=6].
+    """
+    left = model.predict(img)
+    flip = np.flip(model.predict(np.flip(img, axis=2)), axis=2)
+    return (left + flip) / 2
+
+def run_predict(img, step=3):
+    """Runs the segmentation model on a larger image (intended: 256 x 256).
+
+    Follows a sliding-window fashion and combines multiple per-patch results.
+
+    Args:
+        img: Input image of shape [B, H=256, W=256, C=3].
+        step: Step size for the sliding window.
+
+    Returns:
+        Segmentation prediction of shape [B, H=256, W=256, N_CLASSES=6].
+    """
+    canvas = np.zeros(shape=list(img.shape[:3]) + [N_CLASSES], dtype=np.float32)
+    num_hits = np.zeros_like(canvas, dtype=np.int32)
+
+    cx_probe = np.minimum(np.array(list(range(0, img.shape[2] - 224 + step, step))), img.shape[2] - 224)
+    cy_probe = np.minimum(np.array(list(range(0, img.shape[1] - 224 + step, step))), img.shape[1] - 224)
+
+    # Sliding-window patch 
+    for cx in cx_probe:
+        for cy in cy_probe:
+            patch = img[:, cy:cy+224, cx:cx+224]
+            res = run_patch_predict(patch)
+
+            # Combine results.
+            canvas[:, cy:cy+224, cx:cx+224] += res
+            num_hits[:, cy:cy+224, cx:cx+224] += 1
+            return canvas / num_hits
+
+# ---------------------------
+# Define custom data generator.
+# ---------------------------
+
 class CustomDataGenerator(tf.keras.utils.Sequence):
     """Custom data generator that yields tuples of (image, mask) for a pre-processed version of the Pascal VOC 2012 dataset."""
     def __init__(self, source_raw, source_mask, filenames, batch_size, target_height, target_width, augmentation=True, full_resolution=False):
@@ -64,8 +132,8 @@ class CustomDataGenerator(tf.keras.utils.Sequence):
                 crop_y = (img_raw.shape[0] - self.target_height) // 2
 
             if not self.full_resolution:
-              img_raw = img_raw[crop_y:crop_y+self.target_height, crop_x:crop_x+self.target_width]
-              img_mask = img_mask[crop_y:crop_y+self.target_height, crop_x:crop_x+self.target_width]
+                img_raw = img_raw[crop_y:crop_y+self.target_height, crop_x:crop_x+self.target_width]
+                img_mask = img_mask[crop_y:crop_y+self.target_height, crop_x:crop_x+self.target_width]
                 
             # Random flipping.
             perform_flip = np.random.rand(1) < 0.5
@@ -80,10 +148,6 @@ class CustomDataGenerator(tf.keras.utils.Sequence):
     def __len__(self):
         return int(np.floor(len(self.filenames) / self.batch_size))
    
-
-def norm_vis(img, mode='rgb'):
-    img_norm = (img - img.min()) / (img.max() - img.min())
-    return img_norm if mode == 'rgb' else np.flip(img_norm, axis=2)
 
 
 
