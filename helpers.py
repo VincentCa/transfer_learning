@@ -39,7 +39,7 @@ def norm_vis(img, mode='rgb'):
     img_norm = (img - img.min()) / (img.max() - img.min())
     return img_norm if mode == 'rgb' else np.flip(img_norm, axis=2)
 
-def run_patch_predict(model, img):
+def run_patch_predict(model, img, deeplab=False):
     """Runs the segmentation model on a single image patch (224 x 224) with flipping.
 
     Args:
@@ -49,10 +49,18 @@ def run_patch_predict(model, img):
         Segmentation prediction of shape [B, H=224, W=224, N_CLASSES=6].
     """
     img = img.copy() * 255.  # Renorm to [0, 255].
-    img = tf.keras.applications.mobilenet_v2.preprocess_input(img)  # Pre-process for MobileNetv2.
+    if not deeplab:
+        img = tf.keras.applications.mobilenet_v2.preprocess_input(img)  # Pre-process for MobileNetv2
+    else:
+        img /= 255.
 
     left = model.predict(img)
     flip = np.flip(model.predict(np.flip(img, axis=2)), axis=2)
+
+    if deeplab:
+        left = left[:, :, CLASSES_TO_KEEP]
+        flip = flip[:, :, CLASSES_TO_KEEP]
+
     return (left + flip) / 2
 
 def run_predict(model, img, step=3):
@@ -348,3 +356,4 @@ FULL_LABEL_MAP = np.arange(len(LABEL_NAMES)).reshape(len(LABEL_NAMES), 1)
 FULL_COLOR_MAP = label_to_color_image(FULL_LABEL_MAP)
 
 N_CLASSES = 6
+CLASSES_TO_KEEP = [0,1,7,8,12,15]
