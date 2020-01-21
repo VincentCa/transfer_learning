@@ -39,7 +39,7 @@ def norm_vis(img, mode='rgb'):
     img_norm = (img - img.min()) / (img.max() - img.min())
     return img_norm if mode == 'rgb' else np.flip(img_norm, axis=2)
 
-def run_patch_predict(img):
+def run_patch_predict(model, img):
     """Runs the segmentation model on a single image patch (224 x 224) with flipping.
 
     Args:
@@ -55,7 +55,7 @@ def run_patch_predict(img):
     flip = np.flip(model.predict(np.flip(img, axis=2)), axis=2)
     return (left + flip) / 2
 
-def run_predict(img, step=3):
+def run_predict(model, img, step=3):
     """Runs the segmentation model on a larger image.
 
     This specific procedure is quite arbitrary: it resizes the input image 
@@ -82,7 +82,7 @@ def run_predict(img, step=3):
     for cx in cx_probe:
         for cy in cy_probe:
             patch = img[:, cy:cy+224, cx:cx+224]
-            res = run_patch_predict(patch)
+            res = run_patch_predict(model, patch)
 
             # Combine results.
             canvas[:, cy:cy+224, cx:cx+224] += res
