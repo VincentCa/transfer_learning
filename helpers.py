@@ -17,6 +17,86 @@ from IPython.display import clear_output
 import cv2
 
 
+# ---------------------------
+# Define helper functions for inference/visualization.
+# ---------------------------
+
+def plot_history(histories, titles):
+    plt.figure(figsize=(12, 6))
+    for history, title in zip(histories, titles):
+        loss = history.history['loss']
+        val_loss = history.history['val_loss']
+
+        plt.plot(range(1, len(loss)+1), loss, label='Training Loss: ' + title)
+        plt.plot(range(1, len(loss)+1), val_loss, label='Validation Loss: ' + title)
+        plt.legend()
+        plt.ylabel('Cross Entropy')
+        plt.title('Training and Validation Loss')
+        plt.xlabel('epoch')
+    plt.show()
+
+def norm_vis(img, mode='rgb'):
+    img_norm = (img - img.min()) / (img.max() - img.min())
+    return img_norm if mode == 'rgb' else np.flip(img_norm, axis=2)
+
+def run_patch_predict(model, img):
+    """Runs the segmentation model on a single image patch (224 x 224) with flipping.
+
+    Args:
+        img: Input image of shape [B, H=224, W=224, C=3] with intensities within range [0,1].
+
+    Returns:
+        Segmentation prediction of shape [B, H=224, W=224, N_CLASSES=6].
+    """
+    img = img.copy() * 255.  # Renorm to [0, 255].
+    img = tf.keras.applications.mobilenet_v2.preprocess_input(img)  # Pre-process for MobileNetv2.
+
+    left = model.predict(img)
+    flip = np.flip(model.predict(np.flip(img, axis=2)), axis=2)
+    return (left + flip) / 2
+
+def run_predict(model, img, step=3):
+    """Runs the segmentation model on a larger image.
+
+    This specific procedure is quite arbitrary: it resizes the input image
+    to 256 x 256 regardless of aspect ratio, and applies the network in a
+    sliding-window fashion to combine multiple per-patch results.
+
+    Args:
+        img: Input image of shape [B, H, W, C=3] with intensities within range [0,1].
+        step: Step size for the sliding window.
+
+    Returns:
+        Segmentation prediction of shape [B, H=256, W=256, N_CLASSES=6].
+    """
+    if img.shape[1] != 256 or img.shape[2] != 256:
+        img_new = np.zeros(shape=(img.shape[0], 256, 256, img.shape[3]))
+        for i in range(img.shape[0]):
+            img_new[i] = cv2.resize(img[i], (256, 256), interpolation=cv2.INTER_LINEAR)  # Resize input image as needed.
+        img = img_new
+
+    canvas = np.zeros(shape=list(img.shape[:3]) + [N_CLASSES], dtype=np.float32)
+    num_hits = np.zeros_like(canvas, dtype=np.int32)
+
+    cx_probe = np.minimum(np.array(list(range(0, img.shape[2] - 224 + step, step))), img.shape[2] - 224)
+    cy_probe = np.minimum(np.array(list(range(0, img.shape[1] - 224 + step, step))), img.shape[1] - 224)
+
+    # Sliding-window patch
+    for cx in cx_probe:
+        for cy in cy_probe:
+            patch = img[:, cy:cy+224, cx:cx+224]
+            res = run_patch_predict(model, patch)
+
+            # Combine results.
+            canvas[:, cy:cy+224, cx:cx+224] += res
+            num_hits[:, cy:cy+224, cx:cx+224] += 1
+    return canvas / num_hits
+
+
+# ---------------------------
+# Define custom data generator.
+# ---------------------------
+
 class CustomDataGenerator(tf.keras.utils.Sequence):
     """Custom data generator that yields tuples of (image, mask) for a pre-processed version of the Pascal VOC 2012 dataset."""
     def __init__(self, source_raw, source_mask, filenames, batch_size, target_height, target_width, augmentation=True, full_resolution=False):
