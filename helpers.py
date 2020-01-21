@@ -155,6 +155,7 @@ class CustomDataGenerator(tf.keras.utils.Sequence):
 
             X[i] = img_raw
             Y[i] = img_mask
+
         return X, Y
 
     def __len__(self):
@@ -165,21 +166,21 @@ def norm_vis(img, mode='rgb'):
     img_norm = (img - img.min()) / (img.max() - img.min())
     return img_norm if mode == 'rgb' else np.flip(img_norm, axis=2)
 
-
-
 class TeacherDataGenerator(tf.keras.utils.Sequence):
-    """data generator that yields tuples of (image, (teacher_labels, true_labels)) for a pre-processed version of the Pascal VOC 2012 dataset."""
+    """data generator that yields tuples of (image, (teacher_labels, true_labels))
+    for a pre-processed version of the Pascal VOC 2012 dataset."""
     def __init__(self,
-                source_raw,
-                filenames,
-                batch_size,
-                target_height,
-                target_width,
-                augmentation=True,
-                full_resolution=False,
-                teacher_model=None,
-                source_mask=None,
-                classes_to_keep=None):
+                    source_raw,
+                    filenames,
+                    batch_size,
+                    target_height,
+                    target_width,
+                    augmentation=True,
+                    full_resolution=False,
+                    teacher_model=None,
+                    source_mask=None,
+                    classes_to_keep=None):
+
         self.source_raw = source_raw
         self.source_mask = source_mask
         self.filenames = filenames
@@ -229,9 +230,9 @@ class TeacherDataGenerator(tf.keras.utils.Sequence):
                 crop_y = (img_raw.shape[0] - self.target_height) // 2
 
             if not self.full_resolution:
-              img_mobilenet = img_mobilenet[crop_y:crop_y+self.target_height, crop_x:crop_x+self.target_width]
-              img_deeplab = img_deeplab[crop_y:crop_y+self.target_height, crop_x:crop_x+self.target_width]
-              img_mask = img_mask[crop_y:crop_y+self.target_height, crop_x:crop_x+self.target_width]
+                img_mobilenet = img_mobilenet[crop_y:crop_y+self.target_height, crop_x:crop_x+self.target_width]
+                img_deeplab = img_deeplab[crop_y:crop_y+self.target_height, crop_x:crop_x+self.target_width]
+                img_mask = img_mask[crop_y:crop_y+self.target_height, crop_x:crop_x+self.target_width]
 
             # Random flipping.
             perform_flip = np.random.rand(1) < 0.5
@@ -253,17 +254,16 @@ class TeacherDataGenerator(tf.keras.utils.Sequence):
         # as supervision for the student model.
         return X, [Y_teacher, Y_true]
 
-
     def __len__(self):
         return int(np.floor(len(self.filenames) / self.batch_size)
 
 
 def create_pascal_label_colormap():
-    """Creates a label colormap used in PASCAL VOC segmentation benchmark.
+    '''Creates a label colormap used in PASCAL VOC segmentation benchmark.
 
     Returns:
-    A Colormap for visualizing segmentation results.
-    """
+        A Colormap for visualizing segmentation results.
+    '''
     colormap = np.zeros((256, 3), dtype=int)
     ind = np.arange(256, dtype=int)
 
