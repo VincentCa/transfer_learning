@@ -186,7 +186,7 @@ def vis_segmentation(image, seg_map):
     plt.show()
 
 # ---------------------------
-# Define custom data generator.
+# Define custom data generators.
 # ---------------------------
 
 class CustomDataGenerator(tf.keras.utils.Sequence):
