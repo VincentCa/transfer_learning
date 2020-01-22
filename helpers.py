@@ -16,6 +16,19 @@ import matplotlib.pyplot as plt
 from IPython.display import clear_output
 import cv2
 
+LABEL_NAMES = np.asarray([
+    'background', 'aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus',
+    'car', 'cat', 'chair', 'cow', 'diningtable', 'dog', 'horse', 'motorbike',
+    'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tv'
+])
+
+
+FULL_LABEL_MAP = np.arange(len(LABEL_NAMES)).reshape(len(LABEL_NAMES), 1)
+FULL_COLOR_MAP = label_to_color_image(FULL_LABEL_MAP)
+
+N_CLASSES = 6
+CLASSES_TO_KEEP = [0,1,7,8,12,15]
+
 
 # ---------------------------
 # Define helper functions for inference/visualization.
@@ -57,11 +70,9 @@ def run_patch_predict(model, img, deeplab=False):
     left = model.predict(img)
     flip = np.flip(model.predict(np.flip(img, axis=2)), axis=2)
 
-    # print("left.shape", left.shape)
-
     if deeplab:
-      left = left[:, :, :, CLASSES_TO_KEEP]
-      flip = flip[:, :, :, CLASSES_TO_KEEP]
+        left = left[:, :, CLASSES_TO_KEEP]
+        flip = flip[:, :, CLASSES_TO_KEEP]
 
     return (left + flip) / 2
 
@@ -101,6 +112,81 @@ def run_predict(model, img, step=3, deeplab=False):
             canvas[:, cy:cy+224, cx:cx+224] += res
             num_hits[:, cy:cy+224, cx:cx+224] += 1
     return canvas / num_hits
+
+def create_pascal_label_colormap():
+    '''Creates a label colormap used in PASCAL VOC segmentation benchmark.
+
+    Returns:
+        A Colormap for visualizing segmentation results.
+    '''
+    colormap = np.zeros((256, 3), dtype=int)
+    ind = np.arange(256, dtype=int)
+
+    for shift in reversed(range(8)):
+        for channel in range(3):
+            colormap[:, channel] |= ((ind >> channel) & 1) << shift
+        ind >>= 3
+
+    return colormap
+
+def label_to_color_image(label):
+    """Adds color defined by the dataset colormap to the label.
+
+    Args:
+    label: A 2D array with integer type, storing the segmentation label.
+
+    Returns:
+    result: A 2D array with floating type. The element of the array
+      is the color indexed by the corresponding element in the input label
+      to the PASCAL color map.
+
+    Raises:
+    ValueError: If label is not of rank 2 or its value is larger than color
+      map maximum entry.
+    """
+    if label.ndim != 2:
+        raise ValueError('Expect 2-D input label')
+
+    colormap = create_pascal_label_colormap()
+
+    if np.max(label) >= len(colormap):
+        raise ValueError('label value too large.')
+
+    return colormap[label]
+
+def vis_segmentation(image, seg_map):
+    """Visualizes input image, segmentation map and overlay view."""
+    plt.figure(figsize=(15, 5))
+    grid_spec = gridspec.GridSpec(1, 4, width_ratios=[6, 6, 6, 1])
+
+    plt.subplot(grid_spec[0])
+    plt.imshow(image)
+    plt.axis('off')
+    plt.title('input image')
+
+    plt.subplot(grid_spec[1])
+    seg_image = label_to_color_image(seg_map).astype(np.uint8)
+    plt.imshow(seg_image)
+    plt.axis('off')
+    plt.title('segmentation map')
+
+    plt.subplot(grid_spec[2])
+    plt.imshow(image)
+    plt.imshow(seg_image, alpha=0.7)
+    plt.axis('off')
+    plt.title('segmentation overlay')
+
+    unique_labels = np.unique(seg_map)
+    ax = plt.subplot(grid_spec[3])
+    plt.imshow(
+      FULL_COLOR_MAP[unique_labels].astype(np.uint8), interpolation='nearest')
+    ax.yaxis.tick_right()
+    plt.yticks(range(len(unique_labels)), LABEL_NAMES[unique_labels])
+    plt.xticks([], [])
+    ax.tick_params(width=0.0)
+    plt.grid('off')
+    plt.show()
+
 
 # ---------------------------
 # Define custom data generator.
@@ -170,10 +256,6 @@ class CustomDataGenerator(tf.keras.utils.Sequence):
     def __len__(self):
         return int(np.floor(len(self.filenames) / self.batch_size))
 
-
-def norm_vis(img, mode='rgb'):
-    img_norm = (img - img.min()) / (img.max() - img.min())
-    return img_norm if mode == 'rgb' else np.flip(img_norm, axis=2)
 
 class TeacherDataGenerator(tf.keras.utils.Sequence):
     """data generator that yields tuples of (image, (teacher_labels, true_labels))
@@ -267,94 +349,3 @@ class TeacherDataGenerator(tf.keras.utils.Sequence):
 
     def __len__(self):
         return int(np.floor(len(self.filenames) / self.batch_size))
-
-def create_pascal_label_colormap():
-    '''Creates a label colormap used in PASCAL VOC segmentation benchmark.
-
-    Returns:
-        A Colormap for visualizing segmentation results.
-    '''
-    colormap = np.zeros((256, 3), dtype=int)
-    ind = np.arange(256, dtype=int)
-
-    for shift in reversed(range(8)):
-        for channel in range(3):
-          colormap[:, channel] |= ((ind >> channel) & 1) << shift
-        ind >>= 3
-
-    return colormap
-
-
-def label_to_color_image(label):
-    """Adds color defined by the dataset colormap to the label.
-
-    Args:
-    label: A 2D array with integer type, storing the segmentation label.
-
-    Returns:
-    result: A 2D array with floating type. The element of the array
-      is the color indexed by the corresponding element in the input label
-      to the PASCAL color map.
-
-    Raises:
-    ValueError: If label is not of rank 2 or its value is larger than color
-      map maximum entry.
-    """
-    if label.ndim != 2:
-        raise ValueError('Expect 2-D input label')
-
-    colormap = create_pascal_label_colormap()
-
-    if np.max(label) >= len(colormap):
-        raise ValueError('label value too large.')
-
-    return colormap[label]
-
-
-def vis_segmentation(image, seg_map):
-    """Visualizes input image, segmentation map and overlay view."""
-    plt.figure(figsize=(15, 5))
-    grid_spec = gridspec.GridSpec(1, 4, width_ratios=[6, 6, 6, 1])
-
-    plt.subplot(grid_spec[0])
-    plt.imshow(image)
-    plt.axis('off')
-    plt.title('input image')
-
-    plt.subplot(grid_spec[1])
-    seg_image = label_to_color_image(seg_map).astype(np.uint8)
-    plt.imshow(seg_image)
-    plt.axis('off')
-    plt.title('segmentation map')
-
-    plt.subplot(grid_spec[2])
-    plt.imshow(image)
-    plt.imshow(seg_image, alpha=0.7)
-    plt.axis('off')
-    plt.title('segmentation overlay')
-
-    unique_labels = np.unique(seg_map)
-    ax = plt.subplot(grid_spec[3])
-    plt.imshow(
-      FULL_COLOR_MAP[unique_labels].astype(np.uint8), interpolation='nearest')
-    ax.yaxis.tick_right()
-    plt.yticks(range(len(unique_labels)), LABEL_NAMES[unique_labels])
-    plt.xticks([], [])
-    ax.tick_params(width=0.0)
-    plt.grid('off')
-    plt.show()
-
-
-
-LABEL_NAMES = np.asarray([
-    'background', 'aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus',
-    'car', 'cat', 'chair', 'cow', 'diningtable', 'dog', 'horse', 'motorbike',
-    'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tv'
-])
-
-
-FULL_LABEL_MAP = np.arange(len(LABEL_NAMES)).reshape(len(LABEL_NAMES), 1)
-FULL_COLOR_MAP = label_to_color_image(FULL_LABEL_MAP)
-
-N_CLASSES = 6
-CLASSES_TO_KEEP = [0,1,7,8,12,15]
