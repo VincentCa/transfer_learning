@@ -22,10 +22,6 @@ LABEL_NAMES = np.asarray([
     'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tv'
 ])
 
-
-FULL_LABEL_MAP = np.arange(len(LABEL_NAMES)).reshape(len(LABEL_NAMES), 1)
-FULL_COLOR_MAP = label_to_color_image(FULL_LABEL_MAP)
-
 N_CLASSES = 6
 CLASSES_TO_KEEP = [0,1,7,8,12,15]
 
@@ -349,3 +345,6 @@ class TeacherDataGenerator(tf.keras.utils.Sequence):
 
     def __len__(self):
         return int(np.floor(len(self.filenames) / self.batch_size))
+
+FULL_LABEL_MAP = np.arange(len(LABEL_NAMES)).reshape(len(LABEL_NAMES), 1)
+FULL_COLOR_MAP = label_to_color_image(FULL_LABEL_MAP)
