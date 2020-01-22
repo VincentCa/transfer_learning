@@ -57,13 +57,15 @@ def run_patch_predict(model, img, deeplab=False):
     left = model.predict(img)
     flip = np.flip(model.predict(np.flip(img, axis=2)), axis=2)
 
+    # print("left.shape", left.shape)
+
     if deeplab:
-        left = left[:, :, CLASSES_TO_KEEP]
-        flip = flip[:, :, CLASSES_TO_KEEP]
+      left = left[:, :, :, CLASSES_TO_KEEP]
+      flip = flip[:, :, :, CLASSES_TO_KEEP]
 
     return (left + flip) / 2
 
-def run_predict(model, img, step=3):
+def run_predict(model, img, step=3, deeplab=False):
     """Runs the segmentation model on a larger image.
 
     This specific procedure is quite arbitrary: it resizes the input image
@@ -93,13 +95,12 @@ def run_predict(model, img, step=3):
     for cx in cx_probe:
         for cy in cy_probe:
             patch = img[:, cy:cy+224, cx:cx+224]
-            res = run_patch_predict(model, patch)
+            res = run_patch_predict(model, patch, deeplab=deeplab)
 
             # Combine results.
             canvas[:, cy:cy+224, cx:cx+224] += res
             num_hits[:, cy:cy+224, cx:cx+224] += 1
     return canvas / num_hits
-
 
 # ---------------------------
 # Define custom data generator.
@@ -262,7 +263,7 @@ class TeacherDataGenerator(tf.keras.utils.Sequence):
 
         # We return both the true labels and the teacher's output. We use both
         # as supervision for the student model.
-        return X, [Y_teacher, Y_true]
+        return X_student, [Y_teacher, Y_true]
 
     def __len__(self):
         return int(np.floor(len(self.filenames) / self.batch_size))
