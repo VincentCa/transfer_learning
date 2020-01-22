@@ -1,4 +1,6 @@
+# ---------------------------
 # Define global imports
+# ---------------------------
 
 import numpy as np
 import tensorflow as tf
@@ -7,6 +9,7 @@ from tensorflow.keras import backend as K
 from tensorflow.keras.layers import Input, Conv2D, AveragePooling2D, UpSampling2D, Concatenate, concatenate
 from tensorflow.keras.preprocessing.image import img_to_array
 from tensorflow.keras.preprocessing.image import load_img
+from tensorflow.keras.models import load_model
 import os
 import skimage
 import skimage.io
@@ -24,7 +27,6 @@ LABEL_NAMES = np.asarray([
 
 N_CLASSES = 6
 CLASSES_TO_KEEP = [0,1,7,8,12,15]
-
 
 # ---------------------------
 # Define helper functions for inference/visualization.
@@ -183,7 +185,6 @@ def vis_segmentation(image, seg_map):
     plt.grid('off')
     plt.show()
 
-
 # ---------------------------
 # Define custom data generator.
 # ---------------------------
@@ -235,8 +236,8 @@ class CustomDataGenerator(tf.keras.utils.Sequence):
                 crop_y = (img_raw.shape[0] - self.target_height) // 2
 
             if not self.full_resolution:
-              img_raw = img_raw[crop_y:crop_y+self.target_height, crop_x:crop_x+self.target_width]
-              img_mask = img_mask[crop_y:crop_y+self.target_height, crop_x:crop_x+self.target_width]
+                img_raw = img_raw[crop_y:crop_y+self.target_height, crop_x:crop_x+self.target_width]
+                img_mask = img_mask[crop_y:crop_y+self.target_height, crop_x:crop_x+self.target_width]
 
             # Random flipping.
             perform_flip = np.random.rand(1) < 0.5
